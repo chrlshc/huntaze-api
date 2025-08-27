@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: huntaze-api
+    runtime: node
+    buildCommand: npm ci && npx prisma generate && npm run build
+    startCommand: npx prisma db push && node dist/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: huntaze-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        value: https://huntaze.com
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+
+databases:
+  - name: huntaze-db
+    databaseName: huntaze
+    user: huntaze

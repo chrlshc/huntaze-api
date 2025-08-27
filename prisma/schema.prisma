@@ -1,0 +1,201 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model - Core user information
+model User {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  name             String?
+  avatar           String?
+  googleId         String?   @unique
+  stripeCustomerId String?   @unique
+  
+  // Relations
+  subscription     Subscription?
+  aiConfig         AiConfig?
+  platforms        Platform[]
+  conversations    Conversation[]
+  analytics        Analytics[]
+  
+  // Timestamps
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  lastLoginAt      DateTime?
+  
+  @@index([email])
+  @@index([stripeCustomerId])
+}
+
+// Subscription model - Stripe subscription info
+model Subscription {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  stripeSubscriptionId String @unique
+  priceId            String
+  status             String
+  
+  currentPeriodEnd   DateTime
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  
+  @@index([stripeSubscriptionId])
+}
+
+// AI Configuration - User's AI assistant settings
+model AiConfig {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Personality settings
+  personality      Json     // { tone: string, style: string, traits: string[] }
+  responseStyle    String   // flirty, friendly, professional
+  
+  // Content pricing
+  pricing          Json     // { photos: number, videos: number, custom: number }
+  
+  // Custom responses
+  customResponses  Json     // { greetings: [], sales_pitches: [], etc }
+  
+  // Learning data
+  trainingData     Json?    // Past conversations for training
+  
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// Platform connections - OnlyFans, Fansly, etc
+model Platform {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type             PlatformType
+  username         String
+  accessToken      String   @db.Text // Encrypted
+  refreshToken     String?  @db.Text // Encrypted
+  expiresAt        DateTime?
+  
+  // Platform specific data
+  platformUserId   String?
+  webhookSecret    String?
+  
+  active           Boolean  @default(true)
+  lastSyncAt       DateTime?
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  @@unique([userId, type])
+  @@index([type])
+}
+
+// Conversations - AI managed conversations
+model Conversation {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  platformType     PlatformType
+  platformUserId   String   // Fan's ID on platform
+  fanUsername      String
+  
+  messages         Message[]
+  
+  // Stats
+  totalSpent       Float    @default(0)
+  lastMessageAt    DateTime?
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  @@index([userId, platformType])
+  @@index([platformUserId])
+}
+
+// Messages in conversations
+model Message {
+  id               String   @id @default(cuid())
+  conversationId   String
+  conversation     Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  role             MessageRole // user, assistant, fan
+  content          String   @db.Text
+  
+  // AI metadata
+  aiGenerated      Boolean  @default(false)
+  confidence       Float?   // AI confidence score
+  
+  // Sales data
+  saleAmount       Float?
+  saleType         String?  // photo_set, video, custom
+  
+  createdAt        DateTime @default(now())
+  
+  @@index([conversationId])
+}
+
+// Analytics - Daily aggregated stats
+model Analytics {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  date             DateTime @db.Date
+  
+  // Conversation stats
+  totalMessages    Int      @default(0)
+  aiMessages       Int      @default(0)
+  
+  // Revenue stats
+  revenue          Float    @default(0)
+  sales            Int      @default(0)
+  
+  // Fan stats
+  activeFans       Int      @default(0)
+  newFans          Int      @default(0)
+  
+  createdAt        DateTime @default(now())
+  
+  @@unique([userId, date])
+  @@index([date])
+}
+
+// Enums
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELED
+  UNPAID
+}
+
+enum Plan {
+  FREE_TRIAL
+  PRO
+  ENTERPRISE
+  CUSTOM
+}
+
+enum PlatformType {
+  ONLYFANS
+  FANSLY
+  FANVUE
+  LOYALFANS
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  FAN
+}

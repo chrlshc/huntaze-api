@@ -1,0 +1,33 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Installing dependencies...
+      - npm ci
+      - echo Generating Prisma client...
+      - npx prisma generate
+  
+  build:
+    commands:
+      - echo Building application...
+      - npm run build
+      - echo Build completed on `date`
+  
+  post_build:
+    commands:
+      - echo Running database migrations...
+      - npx prisma db push
+
+artifacts:
+  files:
+    - '**/*'
+  exclude-paths:
+    - node_modules/.cache/**/*
+    - .git/**/*
+    - .env*
+    - README.md
+
+cache:
+  paths:
+    - node_modules/**/*
